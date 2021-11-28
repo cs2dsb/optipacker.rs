@@ -5,4 +5,44 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+# Use the much slower zopfli tool for compressing images. Recommended for release builds only
+zopfli = []
+# Required to run the `bevy_loading` example
+bevy_example = [
+    "bevy/bevy_wgpu",
+    "bevy/bevy_winit",
+    "bevy/render",
+    "bevy/png",
+    "bevy/x11",
+]
+# Adds backtrace info to errors, currently requires nightly
+backtrace = []
+
+[[example]]
+# This example optimizes and packs the contents of examples/assets/textures
+# It shows the code you would need to add to build.rs in your project
+name = "optimize_and_pack"
+
+[[example]]
+# This example shows how you would use the packed assets in a bevy project
+# `optimize_and_pack` example must have been run before this for it to work
+name = "bevy_loading"
+required-features = [ "bevy_example" ]
+
+
 [dependencies]
+oxipng = "5.0.1"
+thiserror = "1.0"
+walkdir = "2.3.2"
+texture_packer = "0.23.1"
+image = { version = "0.23", default-features = false, features = [ "png" ] }
+handlebars = "4.1.5"
+serde = { version = "1.0.130", features = [ "derive" ] }
+regex = "1.5.4"
+pathdiff = "0.2.1"
+
+# These are for the examples
+[dev-dependencies]
+bevy = { version = "0.5.0", default-features = false }
+bevy_asset_loader = { version = "0.6.0" }

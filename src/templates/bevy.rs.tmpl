@@ -1,0 +1,122 @@
+use core::{
+    fmt::Debug,
+    hash::Hash,
+};
+use bevy::{
+    prelude::*,
+    sprite::Rect,
+    ecs::component::Component,
+};
+use bevy_asset_loader::{AssetCollection, AssetLoader};
+
+#[derive(AssetCollection)]
+pub struct AtlasPages {
+    {{#each pages}}
+    #[asset(path = "{{path}}")]
+    pub {{name}}: Handle<Texture>,
+    {{/each}}
+}
+
+#[derive(Debug, Clone)]
+pub struct TextureAtlasInfo {
+    pub atlas: Handle<TextureAtlas>,
+    /// Number of frames in the animation
+    pub frames: u32,
+    /// Width of the first frame. Different sized frame support is untested
+    pub width: f32,
+    /// Height of the first frame. Different sized frame support is untested
+    pub height: f32,
+    /// Added so this component can be used for animation timing but not directly used
+    pub frame_time: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AtlasSprites {
+    {{#each pages}}
+    {{#each items}}
+    pub {{name}}: TextureAtlasInfo,
+    {{/each}}
+    {{/each}}
+}
+
+impl AtlasSprites {
+    //TODO: it would be preferrable for the AssetLoader to work behind a &mut but currently it doesn't
+    pub fn build<State>(app: &mut AppBuilder, load_state: State, mut asset_loader: AssetLoader<State>) -> AssetLoader<State>
+    where
+        State: Component + Debug + Clone + Eq + Hash,
+    {
+        // Add the atlas pages to the loader
+        asset_loader = asset_loader.with_collection::<AtlasPages>();
+
+        // Add the system that creates the actual sprite atlases from the atlas pages
+        let mut system_set = SystemSet::on_exit(load_state);
+        system_set = system_set
+            .with_system(AtlasSprites::create_resources.system());
+        app.add_system_set(system_set);
+
+        asset_loader
+    }
+
+    fn create_resources(
+        mut commands: Commands,
+        mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+        atlas_pages: Res<AtlasPages>,
+    ) {
+        {{#each pages}}
+        {{#each items}}
+        let mut {{name}} = TextureAtlas::new_empty(atlas_pages.{{../name}}.clone(), Vec2::new({{../w}} as f32, {{../h}} as f32));
+        {{#each frames}}
+        {{../name}}.add_texture(Rect {
+            min: Vec2::new({{x}} as f32, {{y}} as f32),
+            max: Vec2::new(({{x}}+{{w}}) as f32, ({{y}}+{{h}}) as f32),
+        });
+        {{/each}}
+
+        // Insert the new texture atlas and grab the handle
+        let {{name}}_handle = texture_atlases.add({{name}});
+        {{/each}}
+        {{/each}}
+
+        // Insert the atlas collection with the handles
+        commands.insert_resource(AtlasSprites {
+            {{#each pages}}
+            {{#each items}}
+            {{name}}: TextureAtlasInfo {
+                atlas: {{name}}_handle,
+                frames: {{len frames}},
+                width: {{frames.0.w}} as f32,
+                height: {{frames.0.h}} as f32,
+                frame_time: 0.,
+            },
+            {{/each}}
+            {{/each}}
+        });
+    }
+
+    /// This is only really for testing purposes so all loaded atlases can be
+    /// added to the screen to test loading is working correctly.
+    /// Use it as a startup system after loading is done
+    #[allow(unused_assignments)]
+    pub fn spawn_all(
+        mut commands: Commands,
+        atlas_sprites: Res<AtlasSprites>,
+    ) {
+        let mut x = 0.;
+
+        {{#each pages}}
+        {{#each items}}
+        commands.spawn_bundle(SpriteSheetBundle {
+            texture_atlas: atlas_sprites.{{name}}.atlas.clone(),
+            sprite: TextureAtlasSprite::new(0),
+            transform: Transform {
+                translation: Vec3::new(x, 0., 0.),
+                ..Default::default()
+            },
+            ..Default::default()
+        }).insert(atlas_sprites.{{name}}.clone());
+        x += atlas_sprites.{{name}}.width + 5.;
+        {{/each}}
+        {{/each}}
+    }
+
+}
